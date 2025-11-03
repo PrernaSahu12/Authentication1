@@ -1,9 +1,16 @@
 const jwt = require("jsonwebtoken");
+const redisClient = require("../services/redis.service");
 
-exports.isAuthenticated = (req, res, next) => {
-  const token = req.cookie.token;
-  if (!token) return res.status(401).json({ msg: "Not logged in" });
+exports.isAuthenticated = async (req, res, next) => {
   try {
+    const token = req.cookie.token;
+    if (!token) return res.status(401).json({ msg: "Not logged in" });
+
+    const isBlacklisted = await redisClient.get(`blacklist:${token}`);
+    if (isBlacklisted) {
+      return res.status(401).json({ message: "Session expired, please login again" });
+    }
+
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = decoded;
     next();
