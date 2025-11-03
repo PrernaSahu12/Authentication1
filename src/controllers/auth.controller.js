@@ -12,14 +12,15 @@ exports.register = async (req, res) => {
     const user = await User.create({ email, password, role });
     const otp = crypto.randomInt(100000, 999999).toString();
 
-    await redisClient.setEx(`otp:${email}`, 120, otp);
-    console.log(`OTP for ${email}:`, otp);
+    await redisClient.set(`otp:${email}`, otp, "EX", 120);
+    console.log("OTP", otp);
 
     return res.status(201).json({
       msg: "User registered. OTP sent. Verify account before login",
       email,
     });
   } catch (err) {
+    console.error("register error", err);
     res.status(500).json({ message: "Server Error", err });
   }
 };
@@ -31,7 +32,8 @@ exports.verify = async (req, res) => {
     const storedOtp = await redisClient.get(`otp:${email}`);
     if (!storedOtp) return res.status(400).json({ message: "Otp expired" });
 
-    if (storedOtp !== otp) return res.status(400).json({ message: "Invalid OTP" });
+    if (storedOtp !== otp)
+      return res.status(400).json({ message: "Invalid OTP" });
 
     await User.findOneAndUpdate({ email }, { isVerified: true });
     await redisClient.del(`otp:${email}`);
@@ -68,18 +70,20 @@ exports.login = async (req, res) => {
 
 exports.logout = async (req, res) => {
   try {
-    const token = req.cookies.token;
-
+    const token = req.cookies.token; 
+    
     if (token) {
-      await redisClient.setEx(`blacklist:${token}`, 60 * 60 * 48, "true");
+      await redisClient.set(`blacklist:${token}`, "true", "EX", 60 * 60 * 24); // ✅ 24 hours blacklist
+      res.clearCookie("token");
     }
 
-    res.clearCookie("token");
-    res.json({ message: "Logged Out Successfully" });
+    return res.json({ message: "Logged out successfully" });
   } catch (error) {
-    res.status(500).json({ message: "Internal Server Error", error });
+    console.error("logout error:", error);
+    return res.status(500).json({ message: "Internal Server Error", error });
   }
 };
+
 
 exports.getAdminData = (req, res) => {
   res.json({ secret: "Only admin can see this data" });
