@@ -73,7 +73,7 @@ exports.logout = async (req, res) => {
     const token = req.cookies.token; 
     
     if (token) {
-      await redisClient.set(`blacklist:${token}`, "true", "EX", 60 * 60 * 24); // ✅ 24 hours blacklist
+      await redisClient.set(`blacklist:${token}`, "true", "EX", 60 * 60 * 24); 
       res.clearCookie("token");
     }
 
